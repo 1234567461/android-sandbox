@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Android Sandbox · 控制面板</title>
+    <style>
+        /* ====================================================
+           设计系统：暗色 + Glassmorphism + 霓虹渐变
+           参考: superdesign.dev/styles/glassmorphism
+           ==================================================== */
+        :root {
+            --bg-base: #0a0e1a;
+            --bg-surface: #131829;
+            --neon-teal:   #00f5d4;
+            --neon-blue:   #00bbf9;
+            --neon-purple: #9b5de5;
+            --neon-pink:   #f15bb5;
+            --neon-amber:  #fbbf24;
+            --neon-red:    #ef4444;
+            --neon-green:  #10b981;
+            --text:        #e2e8f0;
+            --text-dim:    rgba(226, 232, 240, 0.6);
+            --glass-bg:    rgba(255, 255, 255, 0.06);
+            --glass-bg-strong: rgba(255, 255, 255, 0.10);
+            --glass-border: rgba(255, 255, 255, 0.14);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+            --radius: 18px;
+            --radius-sm: 12px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                         'PingFang SC', 'Microsoft YaHei', sans-serif;
+            color: var(--text);
+            background: var(--bg-base);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 动画渐变背景 */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: -20%;
+            background: linear-gradient(135deg,
+                #0a0e1a 0%,
+                #1a1240 25%,
+                #2a1450 50%,
+                #0d2a45 75%,
+                #0a0e1a 100%);
+            background-size: 400% 400%;
+            animation: bgShift 22s ease-in-out infinite;
+            z-index: -2;
+        }
+
+        /* 浮动光球（氛围层） */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 15% 25%, rgba(0, 245, 212, 0.18), transparent 40%),
+                radial-gradient(circle at 85% 15%, rgba(155, 93, 229, 0.20), transparent 40%),
+                radial-gradient(circle at 70% 85%, rgba(0, 187, 249, 0.16), transparent 45%),
+                radial-gradient(circle at 30% 75%, rgba(241, 91, 181, 0.14), transparent 40%);
+            z-index: -1;
+            pointer-events: none;
+            animation: orbFloat 18s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgShift {
+            0%   { background-position: 0% 50%; }
+            50%  { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        @keyframes orbFloat {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(-3%, 2%) scale(1.05); }
+        }
+
+        /* ====================================================
+           通用毛玻璃组件
+           ==================================================== */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px) saturate(160%);
+            -webkit-backdrop-filter: blur(16px) saturate(160%);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            border-radius: var(--radius);
+        }
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+            .glass { background: rgba(17, 25, 40, 0.92); }
+        }
+
+        /* ====================================================
+           顶部栏
+           ==================================================== */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 24px;
+            background: rgba(10, 14, 26, 0.65);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .logo {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--neon-teal), var(--neon-blue), var(--neon-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 800;
+            color: #0a0e1a;
+            box-shadow: 0 0 18px rgba(0, 245, 212, 0.45);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .brand:hover .logo { transform: rotate(-8deg) scale(1.05); }
+        .brand .title {
+            font-size: 17px;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--neon-teal), var(--neon-purple));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .brand .subtitle {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: -2px;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: var(--neon-green);
+            transition: 0.3s;
+        }
+        .status-pill .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--neon-green);
+            box-shadow: 0 0 8px var(--neon-green);
+            animation: pulse 2s infinite;
+        }
+        .status-pill.offline {
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.35);
+            color: var(--neon-red);
+        }
+        .status-pill.offline .dot { background: var(--neon-red); box-shadow: 0 0 8px var(--neon-red); }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* ====================================================
+           布局
+           ==================================================== */
+        .main {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 360px;
+            gap: 18px;
+            padding: 18px 24px 40px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        @media (max-width: 1100px) {
+            .main { grid-template-columns: 1fr; }
+        }
+        .left-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+        .right-col { display: flex; flex-direction: column; gap: 16px; }
+
+        .card {
+            padding: 18px;
+        }
+        .card h3 {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+        .card h3::before {
+            content: '';
+            width: 4px; height: 16px;
+            background: linear-gradient(180deg, var(--neon-teal), var(--neon-blue));
+            border-radius: 2px;
+            box-shadow: 0 0 8px rgba(0, 245, 212, 0.5);
+        }
+
+        /* ====================================================
+           屏幕
+           ==================================================== */
+        .screen-wrap {
+            position: relative;
+            background: #000;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            display: inline-block;
+            max-width: 100%;
+            box-shadow: 0 0 40px rgba(0, 187, 249, 0.25);
+        }
+        #screen {
+            display: block;
+            cursor: crosshair;
+            max-width: 100%;
+            height: auto;
+            image-rendering: -webkit-optimize-contrast;
+            background:
+                linear-gradient(45deg, #1a1a2e 25%, transparent 25%, transparent 75%, #1a1a2e 75%),
+                linear-gradient(45deg, #1a1a2e 25%, transparent 25%, transparent 75%, #1a1a2e 75%);
+            background-size: 24px 24px;
+            background-position: 0 0, 12px 12px;
+            background-color: #0a0e1a;
+        }
+        .screen-wrap.active #screen { cursor: pointer; }
+        .screen-wrap.kb-active #screen { cursor: text; box-shadow: 0 0 0 2px var(--neon-teal); }
+
+        .coords {
+            position: absolute;
+            top: 8px; right: 10px;
+            color: var(--neon-teal);
+            font-size: 11px;
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            text-shadow: 0 0 6px #000;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2px 8px;
+            border-radius: 4px;
+            backdrop-filter: blur(4px);
+        }
+        .screen-placeholder {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            font-size: 14px;
+            text-align: center;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .screen-placeholder .spinner {
+            width: 28px; height: 28px;
+            border: 3px solid rgba(0, 245, 212, 0.2);
+            border-top-color: var(--neon-teal);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .stream-controls {
+            margin-top: 14px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* ====================================================
+           按钮
+           ==================================================== */
+        .btn {
+            padding: 10px 16px;
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            background: var(--glass-bg);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            background: var(--glass-bg-strong);
+            border-color: rgba(0, 245, 212, 0.4);
+            box-shadow: 0 4px 18px rgba(0, 245, 212, 0.25);
+        }
+        .btn:active { transform: translateY(0); }
+        .btn-big { padding: 12px 18px; flex: 1; }
+
+        .btn-teal {
+            background: linear-gradient(135deg, rgba(0, 245, 212, 0.18), rgba(0, 187, 249, 0.12));
+            border-color: rgba(0, 245, 212, 0.4);
+            color: var(--neon-teal);
+        }
+        .btn-teal:hover { box-shadow: 0 4px 18px rgba(0, 245, 212, 0.45); }
+
+        .btn-purple {
+            background: linear-gradient(135deg, rgba(155, 93, 229, 0.18), rgba(241, 91, 181, 0.12));
+            border-color: rgba(155, 93, 229, 0.4);
+            color: var(--neon-purple);
+        }
+        .btn-purple:hover { box-shadow: 0 4px 18px rgba(155, 93, 229, 0.45); }
+
+        .btn-pink {
+            background: linear-gradient(135deg, rgba(241, 91, 181, 0.18), rgba(155, 93, 229, 0.12));
+            border-color: rgba(241, 91, 181, 0.4);
+            color: var(--neon-pink);
+        }
+
+        .btn-red {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(241, 91, 181, 0.10));
+            border-color: rgba(239, 68, 68, 0.4);
+            color: var(--neon-red);
+        }
+
+        .btn-green {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(0, 245, 212, 0.10));
+            border-color: rgba(16, 185, 129, 0.4);
+            color: var(--neon-green);
+        }
+
+        .btn-amber {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(241, 91, 181, 0.10));
+            border-color: rgba(251, 191, 36, 0.4);
+            color: var(--neon-amber);
+        }
+
+        /* 按键小键盘 */
+        .key-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+        .key-pad .btn { padding: 10px 4px; font-size: 12px; }
+
+        /* ====================================================
+           输入框
+           ==================================================== */
+        input[type="text"], input[type="number"], textarea, select {
+            width: 100%;
+            background: rgba(10, 14, 26, 0.5);
+            border: 1px solid var(--glass-border);
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-family: inherit;
+            transition: 0.25s;
+            outline: none;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: var(--neon-teal);
+            box-shadow: 0 0 0 3px rgba(0, 245, 212, 0.15);
+        }
+        textarea {
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            resize: vertical;
+            min-height: 64px;
+            font-size: 12px;
+        }
+        ::placeholder { color: var(--text-dim); }
+
+        .row { display: flex; gap: 8px; margin-bottom: 8px; }
+        .row:last-child { margin-bottom: 0; }
+        .row > * { flex: 1; }
+
+        /* ====================================================
+           日志/输出
+           ==================================================== */
+        .log {
+            background: rgba(10, 14, 26, 0.7);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', 'SF Mono', monospace;
+            height: 140px;
+            overflow-y: auto;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+        .log .entry { margin-bottom: 3px; word-break: break-word; }
+        .log .err { color: var(--neon-red); }
+        .log .ok { color: var(--neon-green); }
+        .log .warn { color: var(--neon-amber); }
+        .log .info { color: var(--neon-blue); }
+        .log::-webkit-scrollbar { width: 6px; }
+        .log::-webkit-scrollbar-track { background: transparent; }
+        .log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+        /* 设备信息 */
+        .device-info { font-size: 12px; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+        .device-info .item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px dashed rgba(255,255,255,0.06);
+        }
+        .device-info .item:last-child { border-bottom: none; }
+        .device-info .item b { color: var(--text); font-weight: 500; }
+
+        /* ====================================================
+           键盘捕获指示器
+           ==================================================== */
+        .kb-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            font-size: 12px;
+            font-weight: 600;
+            transition: 0.25s;
+            user-select: none;
+        }
+        .kb-toggle.active {
+            background: linear-gradient(135deg, rgba(0, 245, 212, 0.18), rgba(0, 187, 249, 0.12));
+            border-color: var(--neon-teal);
+            color: var(--neon-teal);
+            box-shadow: 0 0 18px rgba(0, 245, 212, 0.35);
+        }
+        .kb-toggle .switch {
+            width: 32px; height: 18px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 9px;
+            position: relative;
+            transition: 0.25s;
+        }
+        .kb-toggle .switch::after {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: #fff;
+            transition: 0.25s;
+        }
+        .kb-toggle.active .switch { background: var(--neon-teal); }
+        .kb-toggle.active .switch::after { left: 16px; background: #0a0e1a; }
+
+        /* ====================================================
+           隐藏 Root 面板
+           ==================================================== */
+        .hidden-panel {
+            display: none;
+            animation: fadeIn 0.4s;
+        }
+        .hidden-panel.unlocked { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .locked-hint {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-align: center;
+            padding: 8px;
+            border: 1px dashed rgba(155, 93, 229, 0.3);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .root-status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .root-badge {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 8px;
+            background: rgba(10, 14, 26, 0.5);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            font-size: 11px;
+        }
+        .root-badge .label { color: var(--text-dim); }
+        .root-badge .value { font-weight: 700; }
+        .root-badge.on .value { color: var(--neon-green); }
+        .root-badge.off .value { color: var(--neon-red); }
+
+        /* ====================================================
+           Toast 通知
+           ==================================================== */
+        .toast-container {
+            position: fixed;
+            bottom: 24px; right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+        .toast {
+            padding: 10px 16px;
+            background: rgba(10, 14, 26, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            font-size: 13px;
+            color: var(--text);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            animation: toastIn 0.3s, toastOut 0.3s 2.7s forwards;
+            pointer-events: auto;
+        }
+        .toast.ok { border-color: rgba(16, 185, 129, 0.5); color: var(--neon-green); }
+        .toast.err { border-color: rgba(239, 68, 68, 0.5); color: var(--neon-red); }
+        .toast.info { border-color: rgba(0, 187, 249, 0.5); color: var(--neon-blue); }
+        @keyframes toastIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes toastOut { to { transform: translateX(20px); opacity: 0; } }
+    </style>
+</head>
+<body>
+    <!-- 顶部栏 -->
+    <header class="header">
+        <div class="brand" id="brand" title="点我 5 次解锁高级功能">
+            <div class="logo">A</div>
+            <div>
+                <div class="title">Android Sandbox</div>
+                <div class="subtitle">Web 控制台 · v1.0</div>
+            </div>
+        </div>
+        <div class="status-pill offline" id="status-pill">
+            <span class="dot"></span>
+            <span id="status-text">连接中</span>
+        </div>
+    </header>
+
+    <main class="main">
+        <!-- ===================== 左栏 ===================== -->
+        <div class="left-col">
+            <!-- 实时画面 -->
+            <div class="card glass">
+                <h3>实时画面</h3>
+                <div class="screen-wrap" id="screen-wrap">
+                    <img id="screen" src="" alt="" width="380" />
+                    <div class="coords" id="coords">x: -, y: -</div>
+                    <div class="screen-placeholder" id="screen-placeholder">
+                        <div class="spinner"></div>
+                        <div>等待画面…<br>点击下方「开始推流」或「单张截图」</div>
+                    </div>
+                </div>
+                <div class="stream-controls">
+                    <button class="btn btn-green btn-big" id="btn-stream">
+                        <span>▶</span> 开始推流
+                    </button>
+                    <button class="btn btn-big" id="btn-screenshot">
+                        <span>📸</span> 单张截图
+                    </button>
+                    <button class="btn btn-red btn-big" id="btn-stop">
+                        <span>⏹</span> 停止
+                    </button>
+                    <div class="kb-toggle" id="kb-toggle" title="开启后，键盘输入直接发到设备">
+                        <div class="switch"></div>
+                        <span>键盘直输</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 桌面模式 -->
+            <div class="card glass">
+                <h3>桌面模式（自由窗口）</h3>
+                <div class="row">
+                    <button class="btn btn-purple btn-big" onclick="desktopEnable()">启用桌面模式</button>
+                    <button class="btn btn-purple btn-big" onclick="desktopShow()">回到桌面</button>
+                </div>
+                <div class="row">
+                    <input type="text" id="desktop-pkg" placeholder="应用包名，如 com.android.chrome" />
+                </div>
+                <div class="row">
+                    <button class="btn btn-teal btn-big" onclick="desktopLaunch()">以窗口方式启动</button>
+                </div>
+            </div>
+
+            <!-- 操作日志 -->
+            <div class="card glass">
+                <h3>操作日志</h3>
+                <div class="log" id="log"></div>
+            </div>
+        </div>
+
+        <!-- ===================== 右栏 ===================== -->
+        <div class="right-col">
+            <!-- 常用按键 -->
+            <div class="card glass">
+                <h3>常用按键</h3>
+                <div class="key-pad">
+                    <button class="btn" onclick="sendKey('3')">HOME</button>
+                    <button class="btn" onclick="sendKey('4')">BACK</button>
+                    <button class="btn" onclick="sendKey('82')">MENU</button>
+                    <button class="btn" onclick="sendKey('26')">电源</button>
+                    <button class="btn" onclick="sendKey('24')">音量+</button>
+                    <button class="btn" onclick="sendKey('25')">音量-</button>
+                    <button class="btn" onclick="sendKey('164')">静音</button>
+                    <button class="btn" onclick="sendKey('187')">最近任务</button>
+                    <button class="btn" onclick="sendKey('220')">亮屏</button>
+                    <button class="btn" onclick="sendKey('27')">相机</button>
+                    <button class="btn" onclick="sendKey('84')">搜索</button>
+                    <button class="btn" onclick="sendKey('1')">左软键</button>
+                </div>
+            </div>
+
+            <!-- 滑动 -->
+            <div class="card glass">
+                <h3>滑动操作</h3>
+                <div class="row">
+                    <button class="btn btn-big" onclick="swipe('up')">↑ 上滑</button>
+                    <button class="btn btn-big" onclick="swipe('down')">↓ 下滑</button>
+                </div>
+                <div class="row">
+                    <button class="btn btn-big" onclick="swipe('left')">← 左滑</button>
+                    <button class="btn btn-big" onclick="swipe('right')">→ 右滑</button>
+                </div>
+            </div>
+
+            <!-- 文字输入 -->
+            <div class="card glass">
+                <h3>文字输入</h3>
+                <div class="row">
+                    <input type="text" id="text-input" placeholder="输入文字后回车发送"
+                           onkeydown="if(event.key==='Enter'){sendText();event.preventDefault();}" />
+                </div>
+                <div class="row">
+                    <button class="btn btn-teal btn-big" onclick="sendText()">发送到设备</button>
+                </div>
+            </div>
+
+            <!-- Shell -->
+            <div class="card glass">
+                <h3>Shell 命令</h3>
+                <div class="row">
+                    <textarea id="shell-input" placeholder="例如: ls /sdcard/&#10;pm list packages -3"></textarea>
+                </div>
+                <div class="row">
+                    <button class="btn btn-amber btn-big" onclick="sendShell()">执行</button>
+                </div>
+                <div id="shell-output" class="log" style="margin-top:8px;"></div>
+            </div>
+
+            <!-- 应用管理 -->
+            <div class="card glass">
+                <h3>应用管理</h3>
+                <div class="row">
+                    <input type="text" id="pkg-name" placeholder="包名 com.example.app" />
+                </div>
+                <div class="row">
+                    <button class="btn btn-green btn-big" onclick="launchApp()">启动</button>
+                    <button class="btn btn-red btn-big" onclick="stopApp()">停止</button>
+                </div>
+                <div class="row">
+                    <input type="text" id="apk-path" placeholder="APK 路径 /tmp/app.apk" />
+                </div>
+                <div class="row">
+                    <button class="btn btn-big" onclick="installApk()">安装</button>
+                    <button class="btn btn-red btn-big" onclick="uninstallApp()">卸载</button>
+                </div>
+            </div>
+
+            <!-- 设备信息 -->
+            <div class="card glass">
+                <h3>设备信息</h3>
+                <div class="device-info" id="device-info">点击下方按钮刷新</div>
+                <div class="row" style="margin-top:10px;">
+                    <button class="btn btn-big" onclick="refreshInfo()">刷新</button>
+                    <button class="btn btn-big" onclick="refreshApps()">应用列表</button>
+                </div>
+            </div>
+
+            <!-- ===================== 隐藏的 Root 面板 ===================== -->
+            <div class="hidden-panel" id="root-panel">
+                <div class="card glass" style="border-color: rgba(155, 93, 229, 0.5);">
+                    <h3 style="background: linear-gradient(90deg, var(--neon-purple), var(--neon-pink)); -webkit-background-clip: text; background-clip: text; color: transparent;">
+                        高级 · Root 管理
+                    </h3>
+
+                    <div class="root-status-grid" id="root-status-grid">
+                        <div class="root-badge off"><span class="label">su 可用</span><span class="value" id="rs-su">?</span></div>
+                        <div class="root-badge off"><span class="label">当前 root</span><span class="value" id="rs-root">?</span></div>
+                        <div class="root-badge off"><span class="label">Magisk</span><span class="value" id="rs-magisk">?</span></div>
+                        <div class="root-badge off"><span class="label">adb root</span><span class="value" id="rs-adbroot">?</span></div>
+                    </div>
+
+                    <div class="row">
+                        <button class="btn btn-purple btn-big" onclick="rootStatus()">检查 Root 状态</button>
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-green btn-big" onclick="rootEnable()">一键启用 adb root</button>
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-amber btn-big" onclick="rootRemount()">Remount /system rw</button>
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-pink btn-big" onclick="magiskInstall()">一键安装 Magisk</button>
+                    </div>
+                    <div class="row" style="margin-top: 10px;">
+                        <textarea id="root-shell-input" placeholder="root shell: 例  mount | grep system"></textarea>
+                    </div>
+                    <div class="row">
+                        <button class="btn btn-purple btn-big" onclick="rootShell()">以 root 执行</button>
+                    </div>
+                    <div id="root-shell-output" class="log" style="margin-top:8px;"></div>
+                </div>
+            </div>
+
+            <!-- 未解锁时的提示 -->
+            <div class="locked-hint" id="locked-hint">
+                🔒 高级功能已隐藏<br>
+                连点 LOGO 5 次或按 Ctrl+Shift+R 解锁
+            </div>
+        </div>
+    </main>
+
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js"></script>
+    <script>
+        // ====================================================
+        // 全局状态
+        // ====================================================
+        const socket = io();
+        const screen = document.getElementById('screen');
+        const logDiv = document.getElementById('log');
+        const shellOutput = document.getElementById('shell-output');
+        const rootShellOutput = document.getElementById('root-shell-output');
+        const screenPlaceholder = document.getElementById('screen-placeholder');
+        const screenWrap = document.getElementById('screen-wrap');
+        let streaming = false;
+        let kbCapture = false;
+        let logoClicks = 0;
+        let logoTimer = null;
+
+        // ====================================================
+        // 日志 / Toast
+        // ====================================================
+        function log(msg, type = '') {
+            const div = document.createElement('div');
+            div.className = 'entry ' + type;
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            div.textContent = `[${time}] ${msg}`;
+            logDiv.appendChild(div);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            // 限制日志条数
+            while (logDiv.children.length > 200) logDiv.removeChild(logDiv.firstChild);
+        }
+
+        function toast(msg, type = 'info') {
+            const t = document.createElement('div');
+            t.className = 'toast ' + type;
+            t.textContent = msg;
+            document.getElementById('toast-container').appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+
+        // ====================================================
+        // WebSocket 事件
+        // ====================================================
+        socket.on('connect', () => {
+            const pill = document.getElementById('status-pill');
+            pill.classList.remove('offline');
+            document.getElementById('status-text').textContent = '已连接';
+            log('已连接到服务器', 'ok');
+        });
+
+        socket.on('disconnect', () => {
+            const pill = document.getElementById('status-pill');
+            pill.classList.add('offline');
+            document.getElementById('status-text').textContent = '连接断开';
+            log('连接断开', 'err');
+        });
+
+        socket.on('status', (data) => log(data.msg));
+        socket.on('devices', (data) => {
+            if (data.devices && data.devices.length) {
+                log(`检测到设备: ${data.devices[0].id} (${data.devices[0].state})`, 'info');
+            } else {
+                log('未检测到设备，请连接 Android 设备或启动模拟器', 'warn');
+            }
+        });
+
+        socket.on('frame', (data) => {
+            if (data.image) {
+                screen.src = 'data:image/png;base64,' + data.image;
+                screenPlaceholder.style.display = 'none';
+            }
+        });
+
+        socket.on('shell_result', (data) => {
+            shellOutput.textContent = data.result || '(空输出)';
+        });
+
+        // ====================================================
+        // 屏幕交互
+        // ====================================================
+        function getScreenCoords(e) {
+            const rect = screen.getBoundingClientRect();
+            const scaleX = (screen.naturalWidth || 1) / rect.width;
+            const scaleY = (screen.naturalHeight || 1) / rect.height;
+            return {
+                x: Math.round((e.clientX - rect.left) * scaleX),
+                y: Math.round((e.clientY - rect.top) * scaleY),
+            };
+        }
+
+        screen.addEventListener('click', (e) => {
+            if (!screen.src) return;
+            const { x, y } = getScreenCoords(e);
+            socket.emit('tap', { x, y });
+            log(`点击 (${x}, ${y})`);
+        });
+
+        // 拖拽 = 滑动
+        let dragStart = null;
+        screen.addEventListener('mousedown', (e) => {
+            if (!screen.src) return;
+            dragStart = getScreenCoords(e);
+        });
+        screen.addEventListener('mouseup', (e) => {
+            if (!dragStart || !screen.src) return;
+            const end = getScreenCoords(e);
+            const dx = Math.abs(end.x - dragStart.x);
+            const dy = Math.abs(end.y - dragStart.y);
+            if (dx > 8 || dy > 8) {
+                socket.emit('swipe', {
+                    x1: dragStart.x, y1: dragStart.y,
+                    x2: end.x, y2: end.y,
+                    duration: 300,
+                });
+                log(`滑动 (${dragStart.x},${dragStart.y}) → (${end.x},${end.y})`);
+            }
+            dragStart = null;
+        });
+
+        screen.addEventListener('mousemove', (e) => {
+            if (!screen.src) return;
+            const { x, y } = getScreenCoords(e);
+            document.getElementById('coords').textContent = `x: ${x}, y: ${y}`;
+        });
+
+        // ====================================================
+        // 推流控制
+        // ====================================================
+        document.getElementById('btn-stream').onclick = () => {
+            socket.emit('start_stream');
+            streaming = true;
+            screenWrap.classList.add('active');
+            log('开始实时推流', 'ok');
+            toast('推流已开始', 'ok');
+        };
+
+        document.getElementById('btn-screenshot').onclick = () => {
+            fetch('/api/screenshot')
+                .then(r => r.blob())
+                .then(b => {
+                    const url = URL.createObjectURL(b);
+                    screen.src = url;
+                    screenPlaceholder.style.display = 'none';
+                    log('已获取截图', 'ok');
+                })
+                .catch(e => {
+                    log('截图失败: ' + e, 'err');
+                    toast('截图失败', 'err');
+                });
+        };
+
+        document.getElementById('btn-stop').onclick = () => {
+            socket.emit('stop_stream');
+            streaming = false;
+            screenWrap.classList.remove('active');
+            log('停止推流');
+        };
+
+        // ====================================================
+        // 键盘捕获开关
+        // ====================================================
+        const kbToggle = document.getElementById('kb-toggle');
+        kbToggle.onclick = () => {
+            kbCapture = !kbCapture;
+            kbToggle.classList.toggle('active', kbCapture);
+            screenWrap.classList.toggle('kb-active', kbCapture);
+            log(`键盘直输: ${kbCapture ? '开' : '关'}`, kbCapture ? 'ok' : 'info');
+            if (kbCapture) toast('键盘已接管，按 ESC 退出', 'info');
+        };
+
+        // 全局键盘捕获
+        document.addEventListener('keydown', (e) => {
+            // ESC 退出键盘模式
+            if (e.key === 'Escape' && kbCapture) {
+                kbToggle.click();
+                e.preventDefault();
+                return;
+            }
+            if (!kbCapture) return;
+            // 不拦截浏览器快捷键（Ctrl/Cmd 组合）
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            // 把按键发到设备
+            const key = e.key;
+            sendKeyboard(key, e.shiftKey);
+            e.preventDefault();
+        });
+
+        function sendKeyboard(key, shift) {
+            fetch('/api/keyboard', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, shift }),
+            })
+            .then(r => r.json())
+            .then(d => {
+                // 仅在日志里显示有意义的按键
+                if (key.length === 1 || ['Enter','Backspace','Tab','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(key)) {
+                    log(`键盘: ${key}`, 'info');
+                }
+            })
+            .catch(err => log('键盘发送失败: ' + err, 'err'));
+        }
+
+        // ====================================================
+        // 基础按键 / 滑动 / 输入
+        // ====================================================
+        function sendKey(keycode) {
+            socket.emit('key', { keycode });
+            log(`按键: ${keycode}`);
+        }
+
+        function swipe(dir) {
+            const w = screen.naturalWidth || 1080;
+            const h = screen.naturalHeight || 1920;
+            const cx = Math.floor(w / 2), cy = Math.floor(h / 2);
+            const d = 300;
+            let x1, y1, x2, y2;
+            switch(dir) {
+                case 'up':    x1=cx; y1=cy+300; x2=cx; y2=cy-300; break;
+                case 'down':  x1=cx; y1=cy-300; x2=cx; y2=cy+300; break;
+                case 'left':  x1=cx+300; y1=cy; x2=cx-300; y2=cy; break;
+                case 'right': x1=cx-300; y1=cy; x2=cx+300; y2=cy; break;
+            }
+            socket.emit('swipe', { x1, y1, x2, y2, duration: d });
+            log(`滑动: ${dir}`);
+        }
+
+        function sendText() {
+            const text = document.getElementById('text-input').value;
+            if (!text) return;
+            socket.emit('input', { text });
+            log(`输入: ${text}`);
+            document.getElementById('text-input').value = '';
+        }
+
+        function sendShell() {
+            const cmd = document.getElementById('shell-input').value;
+            if (!cmd) return;
+            socket.emit('shell', { command: cmd });
+            log(`Shell: ${cmd}`, 'info');
+        }
+
+        // ====================================================
+        // 桌面模式
+        // ====================================================
+        function desktopEnable() {
+            fetch('/api/desktop/enable', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+                .then(r => r.json()).then(d => {
+                    log('桌面模式: ' + (d.result || ''), 'info');
+                    toast('桌面模式已启用', 'ok');
+                });
+        }
+        function desktopShow() {
+            fetch('/api/desktop/show', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+                .then(r => r.json()).then(d => {
+                    log('回到桌面: ' + (d.result || ''), 'info');
+                });
+        }
+        function desktopLaunch() {
+            const pkg = document.getElementById('desktop-pkg').value;
+            if (!pkg) { toast('请填包名', 'err'); return; }
+            fetch('/api/desktop/launch', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ package: pkg }),
+            }).then(r => r.json()).then(d => {
+                log('自由窗口启动: ' + (d.result || ''), 'info');
+                toast('已尝试以窗口方式启动', 'ok');
+            });
+        }
+
+        // ====================================================
+        // 应用管理
+        // ====================================================
+        function launchApp() {
+            const pkg = document.getElementById('pkg-name').value;
+            fetch('/api/launch', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ package: pkg }),
+            }).then(r => r.json()).then(d => log('启动: ' + (d.result || d)));
+        }
+        function stopApp() {
+            const pkg = document.getElementById('pkg-name').value;
+            fetch('/api/stop', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ package: pkg }),
+            }).then(r => r.json()).then(d => log('停止: ' + (d.result || 'ok')));
+        }
+        function installApk() {
+            const path = document.getElementById('apk-path').value;
+            fetch('/api/install', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ path }),
+            }).then(r => r.json()).then(d => {
+                const ok = d.result && d.result.includes('Success');
+                log('安装: ' + d.result, ok ? 'ok' : 'err');
+                toast(ok ? '安装成功' : '安装失败', ok ? 'ok' : 'err');
+            });
+        }
+        function uninstallApp() {
+            const pkg = document.getElementById('pkg-name').value;
+            fetch('/api/uninstall', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ package: pkg }),
+            }).then(r => r.json()).then(d => log('卸载: ' + d.result));
+        }
+
+        // ====================================================
+        // 设备信息
+        // ====================================================
+        function refreshInfo() {
+            fetch('/api/device/info').then(r => r.json()).then(info => {
+                const div = document.getElementById('device-info');
+                div.innerHTML = Object.entries(info).map(
+                    ([k, v]) => `<div class="item"><span>${k}</span><b>${v}</b></div>`
+                ).join('');
+                log('设备信息已刷新', 'ok');
+            });
+        }
+        function refreshApps() {
+            fetch('/api/apps').then(r => r.json()).then(apps => {
+                const div = document.getElementById('device-info');
+                div.innerHTML = apps.map(a => `<div class="item"><span>${a}</span><b>↗</b></div>`).join('');
+                log(`共 ${apps.length} 个第三方应用`, 'ok');
+                toast(`共 ${apps.length} 个应用`, 'info');
+            });
+        }
+
+        // ====================================================
+        // 隐藏 Root 面板解锁
+        // ====================================================
+        const brand = document.getElementById('brand');
+        const rootPanel = document.getElementById('root-panel');
+        const lockedHint = document.getElementById('locked-hint');
+
+        function unlockRoot() {
+            rootPanel.classList.add('unlocked');
+            lockedHint.style.display = 'none';
+            toast('高级功能已解锁', 'ok');
+            log('🔓 高级面板已解锁', 'ok');
+        }
+
+        brand.addEventListener('click', () => {
+            logoClicks++;
+            clearTimeout(logoTimer);
+            logoTimer = setTimeout(() => { logoClicks = 0; }, 1500);
+            if (logoClicks >= 5 && !rootPanel.classList.contains('unlocked')) {
+                unlockRoot();
+                logoClicks = 0;
+            }
+        });
+
+        // Ctrl+Shift+R 解锁（注意：浏览器原生 Ctrl+Shift+R 是硬刷新，要 preventDefault）
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && (e.key === 'R' || e.key === 'r')) {
+                if (!rootPanel.classList.contains('unlocked')) {
+                    e.preventDefault();
+                    unlockRoot();
+                }
+            }
+        });
+
+        // ====================================================
+        // Root API
+        // ====================================================
+        function rootStatus() {
+            fetch('/api/root/status').then(r => r.json()).then(s => {
+                const setBadge = (id, on, text) => {
+                    const el = document.getElementById(id);
+                    el.parentElement.classList.toggle('on', on);
+                    el.parentElement.classList.toggle('off', !on);
+                    el.textContent = text;
+                };
+                setBadge('rs-su', s.su_available, s.su_available ? '是' : '否');
+                setBadge('rs-root', s.is_root, s.is_root ? '是' : '否');
+                setBadge('rs-magisk', s.magisk, s.magisk ? '是' : '否');
+                setBadge('rs-adbroot', /restarting|root/i.test(s.adb_root_response || ''), '查看');
+                log(`Root 状态: su=${s.su_available} root=${s.is_root} magisk=${s.magisk}`, s.is_root || s.su_available ? 'ok' : 'warn');
+            });
+        }
+        function rootEnable() {
+            fetch('/api/root/enable', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+                .then(r => r.json()).then(d => {
+                    log('adb root: ' + d.result, 'info');
+                    toast('已尝试启用 root', 'info');
+                });
+        }
+        function rootRemount() {
+            fetch('/api/root/remount', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+                .then(r => r.json()).then(d => log('remount: ' + d.result, 'info'));
+        }
+        function rootShell() {
+            const cmd = document.getElementById('root-shell-input').value;
+            if (!cmd) return;
+            fetch('/api/root/shell', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ command: cmd }),
+            }).then(r => r.json()).then(d => {
+                rootShellOutput.textContent = d.result || '(空输出)';
+                log(`root# ${cmd}`, 'info');
+            });
+        }
+        function magiskInstall() {
+            if (!confirm('将下载并安装 Magisk APK。\n真机若未解锁 BL，需手动 patch boot.img。\n继续？')) return;
+            toast('正在下载/安装 Magisk…', 'info');
+            fetch('/api/root/magisk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+                .then(r => r.json()).then(d => {
+                    log('Magisk 安装:\n' + d.result, 'info');
+                    toast('Magisk 流程完成，查看日志', 'ok');
+                });
+        }
+
+        // ====================================================
+        // 启动时
+        // ====================================================
+        log('Android Sandbox 控制台已就绪', 'ok');
+        log('提示: 连点左上角 LOGO 5 次解锁高级功能', 'info');
+    </script>
+</body>
+</html>
