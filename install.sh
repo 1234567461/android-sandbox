@@ -202,9 +202,116 @@ else
 fi
 
 # ============================================================
+# 拉起 Android 模拟器（没有真机时的兜底方案）
+# ============================================================
+标题 "第三步：Android 模拟器（无真机时用）"
+echo ""
+echo "  如果你没有真机/外部模拟器，沙箱可以在这台机器上拉起一个 Android 模拟器。"
+echo ""
+echo "  ${绿}[1]${结} 自动装 + 启动模拟器（推荐，无设备时选这个）"
+echo "      会装 Android SDK + 创建一个 AVD + 启动"
+echo "  ${绿}[2]${结} 跳过（我有真机/已有模拟器）"
+echo ""
+read -p "选一个（默认 2）: " 起模拟器
+起模拟器="${起模拟器:-2}"
+
+AVD_NAME=""
+SDK_DIR="${ANDROID_HOME:-$HOME/android-sdk}"
+SDK_INSTALLED=false
+
+if [ "$起模拟器" = "1" ]; then
+    成功 "进入模拟器安装流程"
+
+    # --- 0. KVM 加速检测（不影响安装，但会影响运行性能） ---
+    if [ -e /dev/kvm ]; then
+        成功 "检测到 /dev/kvm，可用硬件加速"
+    else
+        警告 "未检测到 /dev/kvm（可能在容器里或未开虚拟化）"
+        echo "  模拟器仍可启动，但会非常慢（软渲染）。"
+        echo "  若要硬件加速：BIOS 开 VT-x/SVM，或用支持嵌套虚拟化的主机。"
+    fi
+
+    # --- 1. 装 SDK 工具 ---
+    SDK_DIR="${ANDROID_HOME:-$HOME/android-sdk}"
+    mkdir -p "$SDK_DIR"
+    export ANDROID_HOME="$SDK_DIR"
+    export ANDROID_SDK_ROOT="$SDK_DIR"
+
+    if [ -x "$SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]; then
+        成功 "cmdline-tools 已存在"
+    else
+        提示 "下载 Android cmdline-tools..."
+        CLT_VER="11076708"
+        CLT_ZIP="commandlinetools-linux-${CLT_VER}_latest.zip"
+        CLT_URL="https://dl.google.com/android/repository/$CLT_ZIP"
+        TMP_ZIP="/tmp/$CLT_ZIP"
+        if command -v wget &>/dev/null; then
+            wget -q "$CLT_URL" -O "$TMP_ZIP" || 警告 "下载失败"
+        elif command -v curl &>/dev/null; then
+            curl -fsSL "$CLT_URL" -o "$TMP_ZIP" || 警告 "下载失败"
+        else
+            报错 "需要 wget 或 curl"
+        fi
+        if [ -f "$TMP_ZIP" ]; then
+            提示 "解压 cmdline-tools..."
+            if command -v unzip &>/dev/null; then
+                unzip -qo "$TMP_ZIP" -d "$SDK_DIR"
+                # cmdline-tools 解压出来是 cmdline-tools/bin，需规范成 latest 子目录
+                mkdir -p "$SDK_DIR/cmdline-tools"
+                if [ -d "$SDK_DIR/cmdline-tools/bin" ] && [ ! -d "$SDK_DIR/cmdline-tools/latest" ]; then
+                    mv "$SDK_DIR/cmdline-tools" "$SDK_DIR/cmdline-tools-tmp"
+                    mkdir -p "$SDK_DIR/cmdline-tools/latest"
+                    mv "$SDK_DIR/cmdline-tools-tmp"/* "$SDK_DIR/cmdline-tools/latest/"
+                    rm -rf "$SDK_DIR/cmdline-tools-tmp"
+                fi
+                成功 "cmdline-tools 安装完成"
+            else
+                警告 "没有 unzip，请手动解压 $TMP_ZIP 到 $SDK_DIR"
+            fi
+            rm -f "$TMP_ZIP"
+        fi
+    fi
+
+    SDKMAN="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
+    AVDMAN="$SDK_DIR/cmdline-tools/latest/bin/avdmanager"
+    EMULATOR_BIN="$SDK_DIR/emulator/emulator"
+
+    if [ -x "$SDKMAN" ]; then
+        export PATH="$SDK_DIR/cmdline-tools/latest/bin:$SDK_DIR/platform-tools:$SDK_DIR/emulator:$PATH"
+        ADB_PATH="$SDK_DIR/platform-tools/adb"
+
+        # --- 2. 装平台 + 系统镜像 + 模拟器 ---
+        提示 "接受 SDK 许可协议并安装组件（platform-tools / emulator / 系统镜像）..."
+        yes 2>/dev/null | "$SDKMAN" --licenses >/dev/null 2>&1 || true
+        "$SDKMAN" "platform-tools" "emulator" "platforms;android-34" "system-images;android-34;google_apis;x86_64" 2>&1 | tail -3
+        成功 "SDK 组件安装完成"
+        SDK_INSTALLED=true
+
+        # --- 3. 创建 AVD ---
+        AVD_NAME="sandbox_avd"
+        if [ -x "$AVDMAN" ]; then
+            提示 "创建 AVD: $AVD_NAME"
+            echo "no" | "$AVDMAN" create avd -n "$AVD_NAME" -k "system-images;android-34;google_apis;x86_64" -d pixel_6 2>/dev/null || 警告 "AVD 创建可能已存在或失败"
+        else
+            警告 "avdmanager 不可用"
+        fi
+
+        # 把环境变量写进 deploy.sh 会在后面处理
+        成功 "模拟器就绪，AVD 名: $AVD_NAME"
+        echo "  启动命令: $EMULATOR_BIN -avd $AVD_NAME -no-window -no-audio -no-boot-anim"
+    else
+        警告 "sdkmanager 不可用，跳过 SDK 安装"
+        echo "  请手动装 Android Studio 或 cmdline-tools"
+    fi
+else
+    警告 "跳过模拟器安装"
+fi
+echo ""
+
+# ============================================================
 # 安装 Python 依赖
 # ============================================================
-标题 "第三步：安装 Python 依赖"
+标题 "第四步：安装 Python 依赖"
 提示 "安装 Flask + Socket.IO..."
 if [ -f "requirements.txt" ]; then
     python3 -m pip install -r requirements.txt -q 2>&1 | tail -1
@@ -218,7 +325,7 @@ echo ""
 # ============================================================
 # 生成部署脚本
 # ============================================================
-标题 "第四步：生成部署脚本"
+标题 "第五步：生成部署脚本"
 
 cat > deploy.sh << DEPLOY_EOF
 #!/bin/bash
@@ -230,19 +337,31 @@ cd "\$(cd "\$(dirname "\$0")" && pwd)"
 
 # 读取配置
 ADB_PATH="${ADB_PATH}"
+SDK_DIR="${SDK_DIR}"
+AVD_NAME="${AVD_NAME}"
+EMULATOR_BIN="${SDK_DIR}/emulator/emulator"
 DEVICE_ID="\${DEVICE_ID:-}"
 HOST="\${HOST:-0.0.0.0}"
 PORT="\${PORT:-7000}"
 FRAME_INTERVAL="\${FRAME_INTERVAL:-1.0}"
+BOOT_TIMEOUT="\${BOOT_TIMEOUT:-180}"   # 等模拟器启动最长秒数
+
+export ANDROID_HOME="\${ANDROID_HOME:-$SDK_DIR}"
+export ANDROID_SDK_ROOT="\$ANDROID_HOME"
 
 echo ""
 echo "============================================"
 echo "  Android Sandbox 部署"
 echo "============================================"
-echo "  ADB:    \$ADB_PATH"
-echo "  设备:   \${DEVICE_ID:-自动检测}"
-echo "  地址:   http://localhost:\$PORT"
-echo "  推流:   每 \${FRAME_INTERVAL}秒一帧"
+echo "  ADB:     \$ADB_PATH"
+echo "  SDK:     \$ANDROID_HOME"
+if [ -n "\$AVD_NAME" ] && [ -x "\$EMULATOR_BIN" ]; then
+echo "  模拟器: \$EMULATOR_BIN"
+echo "  AVD:    \$AVD_NAME"
+fi
+echo "  设备:    \${DEVICE_ID:-自动检测}"
+echo "  地址:    http://localhost:\$PORT"
+echo "  推流:    每 \${FRAME_INTERVAL}秒一帧"
 echo "============================================"
 echo ""
 
@@ -250,16 +369,61 @@ echo ""
 if ! command -v "\$ADB_PATH" &>/dev/null 2>&1; then
     if [ -x "\$HOME/platform-tools/adb" ]; then
         ADB_PATH="\$HOME/platform-tools/adb"
+    elif [ -x "\$ANDROID_HOME/platform-tools/adb" ]; then
+        ADB_PATH="\$ANDROID_HOME/platform-tools/adb"
     else
         echo "❌ 找不到 adb，请先运行 install.sh 或手动安装"
         exit 1
     fi
 fi
 
-# 检查设备
-echo "已连接的设备："
+# 数一下当前有没有真机/已启动的模拟器
+count_online() {
+    "\$ADB_PATH" devices 2>/dev/null | awk 'NR>1 && \$2=="device"{c++} END{print c+0}'
+}
+ONLINE=\$(count_online)
+echo "当前在线设备: \$ONLINE 台"
 "\$ADB_PATH" devices
 echo ""
+
+# ============================================================
+# 如果没有在线设备，且安装时配了 AVD，自动拉起模拟器
+# ============================================================
+if [ "\$ONLINE" -eq 0 ] && [ -n "\$AVD_NAME" ] && [ -x "\$EMULATOR_BIN" ]; then
+    echo "没有在线设备，自动启动本地模拟器..."
+    # -no-window 无界面（跑在服务器上推荐），-no-boot-anim 加快启动
+    nohup "\$EMULATOR_BIN" -avd "\$AVD_NAME" \\
+        -no-window -no-audio -no-boot-anim -no-snapshot-save \\
+        > /tmp/sandbox_emulator.log 2>&1 &
+    EMU_PID=\$!
+    echo "模拟器进程 PID=\$EMU_PID，日志: /tmp/sandbox_emulator.log"
+
+    echo -n "等待模拟器启动"
+    for i in \$(seq 1 "\$BOOT_TIMEOUT"); do
+        sleep 2
+        if "\$ADB_PATH" get-state 2>/dev/null | grep -q device; then
+            ONLINE=\$(count_online)
+            if [ "\$ONLINE" -ge 1 ]; then
+                echo
+                echo "✅ 模拟器已就绪（\${i}*2 秒）"
+                break
+            fi
+        fi
+        echo -n "."
+    done
+
+    ONLINE=\$(count_online)
+    if [ "\$ONLINE" -eq 0 ]; then
+        echo
+        echo "⚠️  模拟器在 \${BOOT_TIMEOUT}*2 秒内没起来"
+        echo "    查看日志: tail -50 /tmp/sandbox_emulator.log"
+        echo "    可能原因: 无 /dev/kvm（容器内常见）、镜像没下完整、内存不足"
+        echo "    现在直接进入 Web 控制台，连上设备后会自动识别"
+    fi
+elif [ "\$ONLINE" -eq 0 ]; then
+    echo "⚠️  没有在线设备，也没配模拟器"
+    echo "    请连真机（开 USB 调试）或重跑 install.sh 选模拟器"
+fi
 
 export ADB_PATH DEVICE_ID HOST PORT FRAME_INTERVAL
 exec python3 sandbox/server.py
@@ -274,11 +438,12 @@ chmod +x deploy.sh
 标题 "安装完成！"
 echo ""
 echo "下一步："
-echo "  1. 确保 Android 设备已用 USB 连接（开了 USB 调试）"
-echo "     或者启动了 Android 模拟器（比如 AVD）"
-echo "  2. 启动服务："
+echo "  1. 启动服务："
 echo "     bash deploy.sh"
-echo "  3. 打开浏览器："
+if [ "$SDK_INSTALLED" = "true" ]; then
+echo "     （检测到没真机时，会自动拉起模拟器 $AVD_NAME）"
+fi
+echo "  2. 打开浏览器："
 echo "     http://localhost:7000"
 echo ""
 echo "如果有多台设备，设置环境变量指定："
@@ -286,4 +451,7 @@ echo "  DEVICE_ID=设备ID bash deploy.sh"
 echo ""
 echo "调整截图频率（秒）："
 echo "  FRAME_INTERVAL=0.5 bash deploy.sh"
+echo ""
+echo "模拟器启动等待超时（秒）："
+echo "  BOOT_TIMEOUT=300 bash deploy.sh"
 echo ""
