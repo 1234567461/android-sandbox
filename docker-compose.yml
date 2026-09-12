@@ -1,0 +1,49 @@
+# ============================================================
+# Android Sandbox — 一键 Docker 部署
+# 用法: docker compose up -d
+# 访问: http://localhost:7000
+#
+# 前提: 宿主机支持 KVM 嵌套虚拟化
+#   Linux 原生: 默认支持
+#   云服务器: 选支持 KVM 的实例（Hetzner CX22 / Scaleway / Oracle AMD 付费）
+#   验证: ls -la /dev/kvm  (或 egrep -c '(vmx|svm)' /proc/cpuinfo > 0)
+# ============================================================
+version: "3.8"
+
+services:
+  android-sandbox:
+    build: .
+    image: android-sandbox:latest
+    container_name: android-sandbox
+    # KVM 设备透传（必需，否则模拟器跑不动）
+    devices:
+      - /dev/kvm
+    # 或退化为 privileged（不推荐，更宽松）
+    # privileged: true
+    ports:
+      - "7000:7000"   # Web 控制台
+      - "5555:5555"   # 远程 ADB（可选，adb connect host:5555）
+    environment:
+      - PORT=7000
+      - HOST=0.0.0.0
+      - FRAME_INTERVAL=1.0          # 推流间隔(秒)，0.5 更流畅
+      - AVD_NAME=sandbox_avd
+      - BOOT_TIMEOUT=180           # 等模拟器启动轮询次数
+      - DEVICE_ID=                 # 留空=自动绑到模拟器
+    volumes:
+      # 持久化 AVD 配置（避免每次重建镜像丢 AVD 状态）
+      - avd_data:/root/.android
+      # 持久化 SDK（避免重复下系统镜像）
+      - sdk_data:/opt/android-sdk
+    restart: unless-stopped
+    # 模拟器启动较慢，给足时间
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7000/api/devices"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 360s
+
+volumes:
+  avd_data:
+  sdk_data:

@@ -1,0 +1,41 @@
+# ============================================================
+# systemd 服务单元 —— 开机自启 Android Sandbox
+# 安装:
+#   sudo cp deploy/android-sandbox.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now android-sandbox
+# 查看日志:
+#   journalctl -u android-sandbox -f
+# ============================================================
+[Unit]
+Description=Android Sandbox Web 控制台
+Documentation=https://github.com/1234567461/android-sandbox
+After=network.target
+# 如果用 docker 部署，改成 After=docker.service
+# After=docker.service
+
+[Service]
+Type=simple
+# --- 直接跑（用 install.sh 装的本地环境）---
+# 改成你实际的项目路径和用户
+User=root
+WorkingDirectory=/root/android-sandbox
+Environment=ADB_PATH=/root/platform-tools/adb
+Environment=DEVICE_ID=
+Environment=HOST=0.0.0.0
+Environment=PORT=7000
+Environment=FRAME_INTERVAL=1.0
+ExecStart=/usr/bin/python3 /root/android-sandbox/sandbox/server.py
+Restart=on-failure
+RestartSec=5
+
+# --- Docker 部署的话用下面这段（替换掉 ExecStart）---
+# WorkingDirectory=/root/android-sandbox
+# ExecStart=/usr/bin/docker compose -f /root/android-sandbox/docker-compose.yml up --build
+# ExecStop=/usr/bin/docker compose -f /root/android-sandbox/docker-compose.yml down
+
+# 等模拟器启动较慢，给足超时
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
