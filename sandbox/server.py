@@ -51,6 +51,21 @@ def api_devices():
     """列出所有已连接设备"""
     return jsonify(adb.devices())
 
+@app.route("/api/device/current")
+def api_device_current():
+    """返回当前选中的设备 id"""
+    return jsonify({"id": adb.current_device()})
+
+@app.route("/api/device/select", methods=["POST"])
+def api_device_select():
+    """切换当前操作的设备
+
+    body: {"id": "emulator-5554"} 或 {"id": ""} 表示自动选第一个
+    """
+    dev_id = request.json.get("id", "")
+    cur = adb.set_device(dev_id)
+    return jsonify({"ok": True, "current": cur, "devices": adb.devices()})
+
 @app.route("/api/device/info")
 def api_device_info():
     """获取设备信息"""

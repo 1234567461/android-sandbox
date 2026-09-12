@@ -425,6 +425,29 @@ elif [ "\$ONLINE" -eq 0 ]; then
     echo "    请连真机（开 USB 调试）或重跑 install.sh 选模拟器"
 fi
 
+# ============================================================
+# 抓当前选中的设备 id（模拟器优先，没有就取第一个 online）
+# 这样 server.py 启动时直接绑定到这台设备，避免多设备时报错
+# ============================================================
+pick_device() {
+    "\$ADB_PATH" devices 2>/dev/null | awk 'NR>1 && \$2=="device"{print \$1}' | head -1
+}
+# 如果启动时配了 AVD（说明走的是模拟器路径），优先选 emulator-xxxx
+if [ -n "\$AVD_NAME" ]; then
+    EMU_ID=\$("\$ADB_PATH" devices 2>/dev/null | awk 'NR>1 && \$2=="device" && \$1 ~ /^emulator/{print \$1; exit}')
+    [ -n "\$EMU_ID" ] && PICKED="\$EMU_ID" || PICKED=\$(pick_device)
+else
+    PICKED=\$(pick_device)
+fi
+
+if [ -n "\$PICKED" ]; then
+    echo "✅ 绑定设备: \$PICKED"
+    # 如果用户没显式设 DEVICE_ID，就用我们自动抓的
+    [ -z "\$DEVICE_ID" ] && DEVICE_ID="\$PICKED"
+else
+    echo "⚠️  暂无在线设备，server 会以自动检测模式启动"
+fi
+
 export ADB_PATH DEVICE_ID HOST PORT FRAME_INTERVAL
 exec python3 sandbox/server.py
 DEPLOY_EOF

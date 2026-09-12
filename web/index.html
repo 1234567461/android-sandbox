@@ -612,6 +612,22 @@
 
         <!-- ===================== 右栏 ===================== -->
         <div class="right-col">
+            <!-- 设备选择 -->
+            <div class="card glass">
+                <h3>设备选择</h3>
+                <div class="row">
+                    <select id="device-select" onchange="selectDevice()">
+                        <option value="">自动检测</option>
+                    </select>
+                </div>
+                <div class="row">
+                    <button class="btn btn-teal btn-big" onclick="refreshDevices()">刷新设备列表</button>
+                </div>
+                <div style="font-size:11px; color: var(--text-dim); margin-top:4px;">
+                    当前: <span id="current-device" style="color: var(--neon-teal); font-family: monospace;">-</span>
+                </div>
+            </div>
+
             <!-- 常用按键 -->
             <div class="card glass">
                 <h3>常用按键</h3>
@@ -1051,6 +1067,45 @@
         }
 
         // ====================================================
+        // 设备选择（多设备时切换，模拟器/真机都支持）
+        // ====================================================
+        function refreshDevices() {
+            fetch('/api/devices').then(r => r.json()).then(list => {
+                const sel = document.getElementById('device-select');
+                const cur = sel.value;
+                sel.innerHTML = '<option value="">自动检测</option>';
+                (list || []).forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.id;
+                    // 模拟器标个标识，方便认
+                    const isEmu = d.id && d.id.startsWith('emulator');
+                    opt.textContent = `${d.id} (${d.state})${isEmu ? ' · 模拟器' : ''}`;
+                    sel.appendChild(opt);
+                });
+                // 保持之前的选择
+                if (cur) sel.value = cur;
+                // 显示当前设备
+                fetch('/api/device/current').then(r => r.json()).then(c => {
+                    document.getElementById('current-device').textContent = c.id || '(自动)';
+                });
+                log(`检测到 ${(list||[]).length} 台设备`, 'info');
+            }).catch(e => log('设备列表失败: ' + e, 'err'));
+        }
+        function selectDevice() {
+            const id = document.getElementById('device-select').value;
+            fetch('/api/device/select', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ id }),
+            }).then(r => r.json()).then(d => {
+                document.getElementById('current-device').textContent = d.current || '(自动)';
+                log(`切换设备: ${d.current || '自动'}`, 'ok');
+                toast(`已切换到 ${d.current || '自动检测'}`, 'ok');
+                // 切换后刷新下设备信息
+                refreshInfo();
+            });
+        }
+
+        // ====================================================
         // 设备信息
         // ====================================================
         function refreshInfo() {
@@ -1160,6 +1215,9 @@
         // ====================================================
         log('Android Sandbox 控制台已就绪', 'ok');
         log('提示: 连点左上角 LOGO 5 次解锁高级功能', 'info');
+        // 自动刷新设备列表 + 设备信息
+        refreshDevices();
+        refreshInfo();
     </script>
 </body>
 </html>

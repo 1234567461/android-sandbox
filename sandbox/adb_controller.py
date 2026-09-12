@@ -22,9 +22,39 @@ class ADBController:
         # 如果指定了设备 ID，所有命令都带 -s 参数
         self._device_arg = f"-s {device_id}" if device_id else ""
 
+    def set_device(self, device_id: str) -> str:
+        """切换/指定当前操作的设备 ID
+
+        传空串表示「自动选第一个 online 设备」。
+        """
+        self.device_id = device_id
+        self._device_arg = f"-s {device_id}" if device_id else ""
+        return self.current_device()
+
+    def current_device(self) -> str:
+        """返回当前实际生效的 device id（没指定时自动探测第一个 online）"""
+        if self.device_id:
+            return self.device_id
+        # 没指定，探测第一个 online 设备
+        for d in self.devices():
+            if d.get("state") == "device":
+                return d["id"]
+        return ""
+
+    def _resolve_device_arg(self) -> str:
+        """解析出本次命令要用的 -s 参数
+
+        没指定 device_id 时，自动探测第一个 online 设备并临时带上，
+        避免「more than one device」错误。
+        """
+        if self._device_arg:
+            return self._device_arg
+        cur = self.current_device()
+        return f"-s {cur}" if cur else ""
+
     def _run(self, args: str, timeout: int = 30) -> str:
         """执行 adb 命令，返回输出"""
-        cmd = f"{self.adb} {self._device_arg} {args}"
+        cmd = f"{self.adb} {self._resolve_device_arg()} {args}"
         try:
             result = subprocess.run(
                 cmd, shell=True, capture_output=True, text=True, timeout=timeout
@@ -39,7 +69,7 @@ class ADBController:
 
     def _run_bytes(self, args: str, timeout: int = 30) -> bytes:
         """执行 adb 命令，返回原始字节数据（用于截图等二进制输出）"""
-        cmd = f"{self.adb} {self._device_arg} {args}"
+        cmd = f"{self.adb} {self._resolve_device_arg()} {args}"
         try:
             result = subprocess.run(
                 cmd, shell=True, capture_output=True, timeout=timeout
@@ -53,8 +83,15 @@ class ADBController:
             return b""
 
     def devices(self) -> list:
-        """列出所有已连接的设备"""
-        output = self._run("devices")
+        """列出所有已连接的设备（不走 _resolve_device_arg，避免递归）"""
+        cmd = f"{self.adb} devices"
+        try:
+            result = subprocess.run(
+                cmd, shell=True, capture_output=True, text=True, timeout=10
+            )
+            output = result.stdout if result.returncode == 0 else ""
+        except Exception:
+            output = ""
         devices = []
         for line in output.split("\n")[1:]:
             line = line.strip()
