@@ -10,11 +10,11 @@ set -e
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; PURPLE='\033[0;35m'; RESET='\033[0m'
 
-say_info() { echo -e "${BLUE}$1${RESET}"; }
-say_ok() { echo -e "${GREEN}✅ $1${RESET}"; }
-say_warn() { echo -e "${YELLOW}⚠️  $1${RESET}"; }
-say_err() { echo -e "${RED}❌ $1${RESET}"; }
-say_title() { echo -e "\n${PURPLE}============================================${RESET}"; echo -e "${PURPLE}  $1${RESET}"; echo -e "${PURPLE}============================================${RESET}"; }
+say_info() { printf "%b\n" "${BLUE}$1${RESET}"; }
+say_ok() { printf "%b\n" "${GREEN}✅ $1${RESET}"; }
+say_warn() { printf "%b\n" "${YELLOW}⚠️  $1${RESET}"; }
+say_err() { printf "%b\n" "${RED}❌ $1${RESET}"; }
+say_title() { printf "\n%b\n" "${PURPLE}============================================${RESET}"; printf "%b\n" "${PURPLE}  $1${RESET}"; printf "%b\n" "${PURPLE}============================================${RESET}"; }
 
 REPO_URL="https://github.com/1234567461/android-sandbox.git"
 INSTALL_DIR="${1:-$HOME/android-sandbox}"
