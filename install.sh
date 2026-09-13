@@ -7,23 +7,23 @@
 set -e
 
 # 颜色
-红='\033[0;31m'; 绿='\033[0;32m'; 黄='\033[1;33m'
-蓝='\033[0;34m'; 紫='\033[0;35m'; 结='\033[0m'
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
+BLUE='\033[0;34m'; PURPLE='\033[0;35m'; RESET='\033[0m'
 
-提示() { echo -e "${蓝}$1${结}"; }
-成功() { echo -e "${绿}✅ $1${结}"; }
-警告() { echo -e "${黄}⚠️  $1${结}"; }
-报错() { echo -e "${红}❌ $1${结}"; }
-标题() { echo -e "\n${紫}============================================${结}"; echo -e "${紫}  $1${结}"; echo -e "${紫}============================================${结}"; }
+say_info() { echo -e "${BLUE}$1${RESET}"; }
+say_ok() { echo -e "${GREEN}✅ $1${RESET}"; }
+say_warn() { echo -e "${YELLOW}⚠️  $1${RESET}"; }
+say_err() { echo -e "${RED}❌ $1${RESET}"; }
+say_title() { echo -e "\n${PURPLE}============================================${RESET}"; echo -e "${PURPLE}  $1${RESET}"; echo -e "${PURPLE}============================================${RESET}"; }
 
-仓库地址="https://github.com/1234567461/android-sandbox.git"
-安装目录="${1:-$HOME/android-sandbox}"
+REPO_URL="https://github.com/1234567461/android-sandbox.git"
+INSTALL_DIR="${1:-$HOME/android-sandbox}"
 
-标题 "Android Sandbox — Linux 一键安装"
+say_title "Android Sandbox — Linux 一键安装"
 echo ""
 echo "这个脚本会帮你："
 echo "  1. 检查环境（Python、git、adb）"
-echo "  2. 选择在线模式还是离线模式"
+echo "  2. 选择在线MODE还是离线MODE"
 echo "  3. 选择是否自动安装 Android Platform Tools（包含 adb）"
 echo "  4. 自动安装 Python 依赖"
 echo "  5. 生成 deploy.sh 部署脚本"
@@ -39,9 +39,9 @@ echo "--- 环境检查 ---"
 # Python
 if command -v python3 &>/dev/null; then
     PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    成功 "Python $PYVER"
+    say_ok "Python $PYVER"
 else
-    报错 "没找到 python3"
+    say_err "没找到 python3"
     echo "  Ubuntu/Debian: sudo apt install python3 python3-pip"
     echo "  CentOS/RHEL:   sudo yum install python3 python3-pip"
     exit 1
@@ -49,83 +49,83 @@ fi
 
 # pip
 if python3 -m pip --version &>/dev/null; then
-    成功 "pip 已安装"
+    say_ok "pip 已安装"
 else
-    警告 "pip 没装，尝试自动安装..."
+    say_warn "pip 没装，尝试自动安装..."
     python3 -m ensurepip --upgrade 2>/dev/null || {
-        报错 "pip 安装失败，请手动装"
+        say_err "pip 安装失败，请手动装"
         exit 1
     }
-    成功 "pip 安装完成"
+    say_ok "pip 安装完成"
 fi
 
 # git
 if command -v git &>/dev/null; then
-    成功 "git 已安装"
+    say_ok "git 已安装"
 else
-    警告 "git 没装，尝试自动安装..."
+    say_warn "git 没装，尝试自动安装..."
     if command -v apt &>/dev/null; then
         sudo apt update -qq && sudo apt install -y git
     elif command -v yum &>/dev/null; then
         sudo yum install -y git
     else
-        报错 "git 自动安装失败"
+        say_err "git 自动安装失败"
         exit 1
     fi
-    成功 "git 安装完成"
+    say_ok "git 安装完成"
 fi
 
 # adb
 ADB_OK=false
 if command -v adb &>/dev/null; then
-    成功 "adb 已安装"
+    say_ok "adb 已安装"
     ADB_OK=true
 else
-    警告 "adb 没装"
+    say_warn "adb 没装"
 fi
 
 echo ""
 
 # ============================================================
-# 选择模式
+# 选择MODE
 # ============================================================
-标题 "第一步：选择安装模式"
+say_title "第一步：选择安装MODE"
 echo ""
-echo "  ${绿}[1]${结} 在线模式（推荐）—— 从 GitHub 下载代码"
+echo "  ${GREEN}[1]${RESET} 在线MODE（推荐）—— 从 GitHub 下载代码"
 echo "      需要联网"
 echo ""
-echo "  ${黄}[2]${结} 离线模式 —— 本地已有项目文件"
+echo "  ${YELLOW}[2]${RESET} 离线MODE —— 本地已有项目文件"
 echo "      不需要联网，适合内网"
 echo ""
-read -p "请输入数字（默认 1）: " 模式
-模式="${模式:-1}"
+read -p "请输入数字（默认 1）: " MODE
+MODE="${MODE:-1}"
 
-if [ "$模式" = "1" ]; then
-    成功 "在线模式"
-    if [ -d "$安装目录" ]; then
-        提示 "目录已存在，更新代码..."
-        cd "$安装目录"
+if [ "$MODE" = "1" ]; then
+    say_ok "在线MODE"
+    if [ -d "$INSTALL_DIR" ]; then
+        say_info "目录已存在，更新代码..."
+        cd "$INSTALL_DIR"
         git pull --rebase 2>/dev/null || true
     else
-        提示 "从 GitHub 克隆..."
-        git clone "$仓库地址" "$安装目录"
-        cd "$安装目录"
+        say_info "从 GitHub 克隆..."
+        git clone "$REPO_URL" "$INSTALL_DIR"
+        cd "$INSTALL_DIR"
     fi
-elif [ "$模式" = "2" ]; then
-    成功 "离线模式"
+elif [ "$MODE" = "2" ]; then
+    say_ok "离线MODE"
     if [ -d "./sandbox" ]; then
-        安装目录="$(pwd)"
-        提示 "使用当前目录"
-    elif [ -d "$安装目录/sandbox" ]; then
-        cd "$安装目录"
+        INSTALL_DIR="$(pwd)"
+        say_info "使用当前目录"
+    elif [ -d "$INSTALL_DIR/sandbox" ]; then
+        cd "$INSTALL_DIR"
     else
-        报错 "找不到项目文件，请把项目放到 $安装目录 下"
+        say_err "找不到项目文件，请把项目放到 $INSTALL_DIR 下"
         exit 1
     fi
 else
-    警告 "不认识，默认在线模式"
-    git clone "$仓库地址" "$安装目录" 2>/dev/null || true
-    cd "$安装目录"
+    say_warn "不认识，默认在线MODE"
+    git clone "$REPO_URL" "$INSTALL_DIR" 2>/dev/null || true
+    cd "$INSTALL_DIR"
 fi
 
 echo ""
@@ -134,19 +134,19 @@ echo ""
 # 安装 ADB
 # ============================================================
 if [ "$ADB_OK" = false ]; then
-    标题 "第二步：安装 ADB（Android Platform Tools）"
+    say_title "第二步：安装 ADB（Android Platform Tools）"
     echo ""
-    echo "  ${绿}[1]${结} 自动安装（推荐，会从 Google 下载）"
-    echo "  ${绿}[2]${结} 跳过（我手动装，或者用模拟器自带的 adb）"
+    echo "  ${GREEN}[1]${RESET} 自动安装（推荐，会从 Google 下载）"
+    echo "  ${GREEN}[2]${RESET} 跳过（我手动装，或者用模拟器自带的 adb）"
     echo ""
     read -p "选一个（默认 1）: " 装adb
     装adb="${装adb:-1}"
 
     if [ "$装adb" = "1" ]; then
-        提示 "下载 Android Platform Tools..."
+        say_info "下载 Android Platform Tools..."
         # 尝试用包管理器装
         if command -v apt &>/dev/null; then
-            sudo apt install -y android-tools-adb 2>/dev/null && 成功 "adb 安装完成（apt）"
+            sudo apt install -y android-tools-adb 2>/dev/null && say_ok "adb 安装完成（apt）"
         fi
         # 如果包管理器没装上，手动下载
         if ! command -v adb &>/dev/null; then
@@ -154,34 +154,34 @@ if [ "$ADB_OK" = false ]; then
             if [ ! -d "$PT_DIR" ]; then
                 URL="https://dl.google.com/android/repository/platform-tools-latest-linux.zip"
                 TMP="/tmp/ptools.zip"
-                提示 "从 Google 下载 Platform Tools..."
+                say_info "从 Google 下载 Platform Tools..."
                 if command -v wget &>/dev/null; then
-                    wget -q "$URL" -O "$TMP" || { 警告 "下载失败，请手动安装 adb"; }
+                    wget -q "$URL" -O "$TMP" || { say_warn "下载失败，请手动安装 adb"; }
                 elif command -v curl &>/dev/null; then
-                    curl -fsSL "$URL" -o "$TMP" || { 警告 "下载失败，请手动安装 adb"; }
+                    curl -fsSL "$URL" -o "$TMP" || { say_warn "下载失败，请手动安装 adb"; }
                 fi
                 if [ -f "$TMP" ]; then
-                    提示 "解压..."
+                    say_info "解压..."
                     if command -v unzip &>/dev/null; then
-                        unzip -qo "$TMP" -d "$HOME" && 成功 "Platform Tools 安装完成"
+                        unzip -qo "$TMP" -d "$HOME" && say_ok "Platform Tools 安装完成"
                     else
-                        警告 "没有 unzip，请手动解压 $TMP"
+                        say_warn "没有 unzip，请手动解压 $TMP"
                     fi
                     rm -f "$TMP"
                 fi
             fi
             # 检查
             if [ -x "$PT_DIR/adb" ]; then
-                成功 "adb 路径: $PT_DIR/adb"
+                say_ok "adb 路径: $PT_DIR/adb"
                 ADB_PATH="$PT_DIR/adb"
                 # 加到 PATH
                 if ! echo "$PATH" | grep -q "platform-tools"; then
                     echo "export PATH=\$HOME/platform-tools:\$PATH" >> "$HOME/.bashrc"
-                    提示 "已把 platform-tools 加入 PATH（下次开终端生效）"
+                    say_info "已把 platform-tools 加入 PATH（下次开终端生效）"
                     export PATH="$PT_DIR:$PATH"
                 fi
             else
-                警告 "adb 没装上，请手动安装"
+                say_warn "adb 没装上，请手动安装"
                 echo "  方式1: sudo apt install android-tools-adb"
                 echo "  方式2: 从 https://developer.android.com/tools/releases/platform-tools 下载"
                 ADB_PATH="adb"
@@ -190,43 +190,43 @@ if [ "$ADB_OK" = false ]; then
             ADB_PATH="adb"
         fi
     else
-        警告 "跳过 adb 安装"
+        say_warn "跳过 adb 安装"
         echo "  请确保 adb 在 PATH 里，或者后面在 config.sh 里指定路径"
         ADB_PATH="adb"
     fi
     echo ""
 else
     ADB_PATH="adb"
-    标题 "第二步：ADB 已安装，跳过"
+    say_title "第二步：ADB 已安装，跳过"
     echo ""
 fi
 
 # ============================================================
 # 拉起 Android 模拟器（没有真机时的兜底方案）
 # ============================================================
-标题 "第三步：Android 模拟器（无真机时用）"
+say_title "第三步：Android 模拟器（无真机时用）"
 echo ""
 echo "  如果你没有真机/外部模拟器，沙箱可以在这台机器上拉起一个 Android 模拟器。"
 echo ""
-echo "  ${绿}[1]${结} 自动装 + 启动模拟器（推荐，无设备时选这个）"
+echo "  ${GREEN}[1]${RESET} 自动装 + 启动模拟器（推荐，无设备时选这个）"
 echo "      会装 Android SDK + 创建一个 AVD + 启动"
-echo "  ${绿}[2]${结} 跳过（我有真机/已有模拟器）"
+echo "  ${GREEN}[2]${RESET} 跳过（我有真机/已有模拟器）"
 echo ""
-read -p "选一个（默认 2）: " 起模拟器
-起模拟器="${起模拟器:-2}"
+read -p "选一个（默认 2）: " START_EMU
+START_EMU="${START_EMU:-2}"
 
 AVD_NAME=""
 SDK_DIR="${ANDROID_HOME:-$HOME/android-sdk}"
 SDK_INSTALLED=false
 
-if [ "$起模拟器" = "1" ]; then
-    成功 "进入模拟器安装流程"
+if [ "$START_EMU" = "1" ]; then
+    say_ok "进入模拟器安装流程"
 
     # --- 0. KVM 加速检测（不影响安装，但会影响运行性能） ---
     if [ -e /dev/kvm ]; then
-        成功 "检测到 /dev/kvm，可用硬件加速"
+        say_ok "检测到 /dev/kvm，可用硬件加速"
     else
-        警告 "未检测到 /dev/kvm（可能在容器里或未开虚拟化）"
+        say_warn "未检测到 /dev/kvm（可能在容器里或未开虚拟化）"
         echo "  模拟器仍可启动，但会非常慢（软渲染）。"
         echo "  若要硬件加速：BIOS 开 VT-x/SVM，或用支持嵌套虚拟化的主机。"
     fi
@@ -238,22 +238,22 @@ if [ "$起模拟器" = "1" ]; then
     export ANDROID_SDK_ROOT="$SDK_DIR"
 
     if [ -x "$SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]; then
-        成功 "cmdline-tools 已存在"
+        say_ok "cmdline-tools 已存在"
     else
-        提示 "下载 Android cmdline-tools..."
+        say_info "下载 Android cmdline-tools..."
         CLT_VER="11076708"
         CLT_ZIP="commandlinetools-linux-${CLT_VER}_latest.zip"
         CLT_URL="https://dl.google.com/android/repository/$CLT_ZIP"
         TMP_ZIP="/tmp/$CLT_ZIP"
         if command -v wget &>/dev/null; then
-            wget -q "$CLT_URL" -O "$TMP_ZIP" || 警告 "下载失败"
+            wget -q "$CLT_URL" -O "$TMP_ZIP" || say_warn "下载失败"
         elif command -v curl &>/dev/null; then
-            curl -fsSL "$CLT_URL" -o "$TMP_ZIP" || 警告 "下载失败"
+            curl -fsSL "$CLT_URL" -o "$TMP_ZIP" || say_warn "下载失败"
         else
-            报错 "需要 wget 或 curl"
+            say_err "需要 wget 或 curl"
         fi
         if [ -f "$TMP_ZIP" ]; then
-            提示 "解压 cmdline-tools..."
+            say_info "解压 cmdline-tools..."
             if command -v unzip &>/dev/null; then
                 unzip -qo "$TMP_ZIP" -d "$SDK_DIR"
                 # cmdline-tools 解压出来是 cmdline-tools/bin，需规范成 latest 子目录
@@ -264,9 +264,9 @@ if [ "$起模拟器" = "1" ]; then
                     mv "$SDK_DIR/cmdline-tools-tmp"/* "$SDK_DIR/cmdline-tools/latest/"
                     rm -rf "$SDK_DIR/cmdline-tools-tmp"
                 fi
-                成功 "cmdline-tools 安装完成"
+                say_ok "cmdline-tools 安装完成"
             else
-                警告 "没有 unzip，请手动解压 $TMP_ZIP 到 $SDK_DIR"
+                say_warn "没有 unzip，请手动解压 $TMP_ZIP 到 $SDK_DIR"
             fi
             rm -f "$TMP_ZIP"
         fi
@@ -281,51 +281,51 @@ if [ "$起模拟器" = "1" ]; then
         ADB_PATH="$SDK_DIR/platform-tools/adb"
 
         # --- 2. 装平台 + 系统镜像 + 模拟器 ---
-        提示 "接受 SDK 许可协议并安装组件（platform-tools / emulator / 系统镜像）..."
+        say_info "接受 SDK 许可协议并安装组件（platform-tools / emulator / 系统镜像）..."
         yes 2>/dev/null | "$SDKMAN" --licenses >/dev/null 2>&1 || true
         "$SDKMAN" "platform-tools" "emulator" "platforms;android-34" "system-images;android-34;google_apis;x86_64" 2>&1 | tail -3
-        成功 "SDK 组件安装完成"
+        say_ok "SDK 组件安装完成"
         SDK_INSTALLED=true
 
         # --- 3. 创建 AVD ---
         AVD_NAME="sandbox_avd"
         if [ -x "$AVDMAN" ]; then
-            提示 "创建 AVD: $AVD_NAME"
-            echo "no" | "$AVDMAN" create avd -n "$AVD_NAME" -k "system-images;android-34;google_apis;x86_64" -d pixel_6 2>/dev/null || 警告 "AVD 创建可能已存在或失败"
+            say_info "创建 AVD: $AVD_NAME"
+            echo "no" | "$AVDMAN" create avd -n "$AVD_NAME" -k "system-images;android-34;google_apis;x86_64" -d pixel_6 2>/dev/null || say_warn "AVD 创建可能已存在或失败"
         else
-            警告 "avdmanager 不可用"
+            say_warn "avdmanager 不可用"
         fi
 
         # 把环境变量写进 deploy.sh 会在后面处理
-        成功 "模拟器就绪，AVD 名: $AVD_NAME"
+        say_ok "模拟器就绪，AVD 名: $AVD_NAME"
         echo "  启动命令: $EMULATOR_BIN -avd $AVD_NAME -no-window -no-audio -no-boot-anim"
     else
-        警告 "sdkmanager 不可用，跳过 SDK 安装"
+        say_warn "sdkmanager 不可用，跳过 SDK 安装"
         echo "  请手动装 Android Studio 或 cmdline-tools"
     fi
 else
-    警告 "跳过模拟器安装"
+    say_warn "跳过模拟器安装"
 fi
 echo ""
 
 # ============================================================
 # 安装 Python 依赖
 # ============================================================
-标题 "第四步：安装 Python 依赖"
-提示 "安装 Flask + Socket.IO..."
+say_title "第四步：安装 Python 依赖"
+say_info "安装 Flask + Socket.IO..."
 if [ -f "requirements.txt" ]; then
     python3 -m pip install -r requirements.txt -q 2>&1 | tail -1
-    成功 "Python 依赖安装完成"
+    say_ok "Python 依赖安装完成"
 else
     python3 -m pip install flask flask-socketio -q 2>&1 | tail -1
-    成功 "Python 依赖安装完成"
+    say_ok "Python 依赖安装完成"
 fi
 echo ""
 
 # ============================================================
 # 生成部署脚本
 # ============================================================
-标题 "第五步：生成部署脚本"
+say_title "第五步：生成部署脚本"
 
 cat > deploy.sh << DEPLOY_EOF
 #!/bin/bash
@@ -387,7 +387,7 @@ echo "当前在线设备: \$ONLINE 台"
 echo ""
 
 # ============================================================
-# 如果没有在线设备，且安装时配了 AVD，自动拉起模拟器
+# 如果没有在线设备，且安装时配了 AVD，自动拉START_EMU
 # ============================================================
 if [ "\$ONLINE" -eq 0 ] && [ -n "\$AVD_NAME" ] && [ -x "\$EMULATOR_BIN" ]; then
     echo "没有在线设备，自动启动本地模拟器..."
@@ -445,7 +445,7 @@ if [ -n "\$PICKED" ]; then
     # 如果用户没显式设 DEVICE_ID，就用我们自动抓的
     [ -z "\$DEVICE_ID" ] && DEVICE_ID="\$PICKED"
 else
-    echo "⚠️  暂无在线设备，server 会以自动检测模式启动"
+    echo "⚠️  暂无在线设备，server 会以自动检测MODE启动"
 fi
 
 export ADB_PATH DEVICE_ID HOST PORT FRAME_INTERVAL
@@ -453,18 +453,18 @@ exec python3 sandbox/server.py
 DEPLOY_EOF
 
 chmod +x deploy.sh
-成功 "部署脚本已生成: deploy.sh"
+say_ok "部署脚本已生成: deploy.sh"
 
 # ============================================================
 # 完成
 # ============================================================
-标题 "安装完成！"
+say_title "安装完成！"
 echo ""
 echo "下一步："
 echo "  1. 启动服务："
 echo "     bash deploy.sh"
 if [ "$SDK_INSTALLED" = "true" ]; then
-echo "     （检测到没真机时，会自动拉起模拟器 $AVD_NAME）"
+echo "     （检测到没真机时，会自动拉START_EMU $AVD_NAME）"
 fi
 echo "  2. 打开浏览器："
 echo "     http://localhost:7000"
